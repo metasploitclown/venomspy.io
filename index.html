@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <title>Demo Tracker — Header Sticky, Terminal & Results</title>
+  <style>
+    /* ---------- Reset ---------- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html,body { height: 100%; }
+    body {
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,#0f1724 0%, #071028 100%);
+      color: #e6eef8;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding-top: 72px; /* reserve header height */
+    }
+
+    /* ---------- Header (sticky) ---------- */
+    header.main-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 72px;
+      background: rgba(5,10,20,0.85);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px;
+      z-index: 1000;
+    }
+    .logo {
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+    .logo img { height: 44px; width: auto; display:block; }
+    .site-title { font-weight:700; font-size:16px; color:#a9d2ff; letter-spacing:0.2px; }
+
+    /* Switch */
+    .controls { display:flex; align-items:center; gap:14px; }
+    .switch {
+      position:relative; width:54px; height:30px; display:inline-block;
+    }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider {
+      position:absolute; cursor:pointer; inset:0; background:#28313a; border-radius:34px; transition:.25s;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
+    }
+    .slider::before {
+      content:""; position:absolute; left:4px; top:4px; width:22px; height:22px; background:white; border-radius:50%;
+      transition:.25s; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+    }
+    input:checked + .slider { background: linear-gradient(90deg,#00b894,#00d2a9); }
+    input:checked + .slider::before { transform:translateX(24px); }
+
+    /* Main container */
+    .container {
+      max-width:1100px; margin:20px auto; padding:20px; display:grid; gap:20px;
+    }
+
+    /* Card */
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.03);
+      padding:18px; border-radius:12px;
+      box-shadow: 0 6px 20px rgba(2,6,23,0.6);
+    }
+
+    /* Form */
+    form.row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .field { display:flex; flex-direction:column; gap:8px; min-width:0; }
+    label { font-size:13px; color:#98b3d9; }
+    select,input[type="tel"] {
+      padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.02); color: #e7f0ff; font-size:15px;
+      outline:none;
+    }
+    input[disabled], button[disabled] { opacity:0.45; cursor:not-allowed; }
+    .hint { font-size:12px; color:#7e99c3; }
+
+    .btn {
+      background: linear-gradient(90deg,#1766ff,#7a5cff);
+      color:white; padding:10px 16px; border-radius:10px; border:none; cursor:pointer;
+      font-weight:600;
+      box-shadow: 0 6px 18px rgba(30,80,250,0.12);
+    }
+
+    /* Small grid menus */
+    .grid {
+      display:grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap:12px;
+    }
+    .grid .menu {
+      padding:12px; border-radius:10px; text-align:center; background: rgba(255,255,255,0.02);
+      border:1px solid rgba(255,255,255,0.02); cursor:pointer;
+      transition: transform .12s, box-shadow .12s;
+    }
+    .grid .menu:hover { transform: translateY(-6px); box-shadow:0 10px 30px rgba(0,0,0,0.5); }
+    .menu .icon { font-size:20px; margin-bottom:8px; color:#9cc6ff; }
+    .menu .title { color:#dfefff; font-weight:600; font-size:14px; }
+
+    /* Terminal modal */
+    .overlay { position:fixed; inset:0; background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.75)); display:none; align-items:center; justify-content:center; z-index:1500; }
+    .overlay.show { display:flex; }
+    .terminal {
+      width: min(920px,95%); max-height:80vh; background:#071018; border-radius:12px; border:1px solid rgba(0,255,140,0.05);
+      padding:18px; box-shadow: 0 30px 80px rgba(0,0,0,0.6); display:flex; flex-direction:column; gap:12px;
+    }
+    .terminal .topbar { display:flex; gap:8px; align-items:center; }
+    .dot { width:12px;height:12px;border-radius:50%; }
+    .dot.red{background:#ff5f56;} .dot.yellow{background:#ffbd2e;} .dot.green{background:#28c840;}
+    .term-window { background:#02040a; color:#9ffea4; padding:12px; border-radius:8px; font-family: "Courier New", monospace; font-size:13px; overflow:auto; height:360px; border:1px solid rgba(255,255,255,0.02); }
+    .term-line { white-space:pre-wrap; margin-bottom:6px; opacity:0.95; }
+    .term-line.note { color:#9fb7ff; }
+    .progress-wrap { display:flex; gap:10px; align-items:center; }
+    .progress {
+      flex:1; background: rgba(255,255,255,0.03); height:12px; border-radius:8px; overflow:hidden;
+      border:1px solid rgba(255,255,255,0.02);
+    }
+    .progress .bar { height:100%; width:0%; background: linear-gradient(90deg,#00ff9e,#00d2ff); transition:width .3s; }
+
+    .term-actions { display:flex; gap:8px; justify-content:flex-end; }
+    .btn.ghost { background:transparent; border:1px solid rgba(255,255,255,0.06); color:#bfe6ff; padding:8px 12px; border-radius:8px; }
+
+    /* Result card (blurred) */
+    .result-card {
+      margin-top:8px; padding:14px; border-radius:12px; position:relative;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03);
+      overflow:hidden;
+    }
+    .result-blur { filter: blur(4px) saturate(0.9); opacity:0.95; pointer-events:none; transition:filter .4s; }
+    .result-card .inner { display:grid; gap:12px; grid-template-columns:1fr 320px; }
+    .result-left { padding:10px; }
+    .result-item { background: rgba(0,0,0,0.14); padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.02); }
+    .label { font-size:12px; color:#8fb8ff; margin-bottom:6px; }
+
+    /* message preview */
+    .message { display:flex; gap:8px; align-items:flex-start; }
+    .msg-thumb { width:56px;height:56px;border-radius:8px; background:#062036; display:flex;align-items:center;justify-content:center;color:#9ee6ff;font-weight:700; }
+    .msg-body { flex:1; }
+    .msg-body p { font-size:14px; color:#eaffff; margin-bottom:6px; }
+    .time { font-size:12px; color:#a3c0e6; }
+
+    /* popup modal */
+    .popup { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); min-width:280px; max-width:90%; background:#071323; color:#e6f3ff; padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.03); z-index:1600; display:none; box-shadow: 0 30px 90px rgba(0,0,0,0.7); }
+    .popup.show { display:block; }
+    .popup h3 { margin-bottom:8px; }
+    .popup .close { position:absolute; right:10px; top:8px; background:transparent; border:none; color:#9fc7ff; font-weight:700; cursor:pointer; }
+
+    /* bottom navbar */
+    nav.bottom-nav {
+      position:fixed; bottom:14px; left:50%; transform:translateX(-50%); width:min(980px,96%); background:rgba(2,8,20,0.8);
+      border-radius:14px; padding:8px; display:flex; gap:8px; justify-content:center; z-index:1000; border:1px solid rgba(255,255,255,0.03);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    }
+    .bottom-nav button { background:transparent; color:#bfe6ff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
+    .bottom-nav button:hover { background: rgba(255,255,255,0.02); }
+
+    /* Responsive smaller layout */
+    @media (max-width:900px){
+      .result-card .inner { grid-template-columns:1fr; }
+      .term-window { height:300px; }
+    }
+
+    @media (max-width:520px){
+      header.main-header{ padding:10px; height:64px; }
+      .site-title { display:none; }
+      .logo img{ height:36px; }
+    }
+    .koordinat-container {
+      position: fixed;
+      top: 50px;
+      left: 0; /* ubah ke right: 0 jika ingin di kanan */
+      height: 100vh;
+      width: 220px;
+      padding: 10px;
+      background-color: ; /* transparan */
+      color: #0f0f;
+      font-size: 14px;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .koordinat-line {
+      margin-bottom: 5px;
+      opacity: 0.5;
+    }
+    
+    .top-nav {
+    position: fixed;
+    top: 130px;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+.top-nav.hidden {
+  display: none;
+}
+
+
+  .phone {
+    width: 130px;
+    height: 250px;
+    background-color: #e5e5e5;
+    border: 5px solid #999;
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    margin: 0 5px;
+  }
+
+    .screen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+
+    .whatsapp-screen {
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.95);
+    }
+
+    .whatsapp-screen.active {
+      opacity: 1;
+      pointer-events: all;
+      transform: scale(1);
+    }
+
+    .home-screen .app-icon {
+      width: 50px;
+      height: 50px;
+      background-color: #25d366;
+      border-radius: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      animation: pulse 2s infinite;
+    }
+
+    .app-icon img {
+      width: 30px;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1);}
+      50% { transform: scale(1.05);}
+      100% { transform: scale(1);}
+    }
+
+    .header {
+      background-color: #075e54;
+      color: white;
+      width: 100%;
+      padding: 5px;
+      font-weight: bold;
+      font-size: 10px;
+      text-align: center;
+    }
+
+    .chat-window {
+      flex: 1;
+      width: 100%;
+      background-color: #000000;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .loader {
+      border: 2px solid #ccc;
+      border-top: 2px solid #25d366;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .input-bar {
+      background-color: #f0f0f0;
+      padding: 5px;
+      width: 100%;
+      color:#000;
+      font-size: 5px;
+      font-weight: bold;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+    }
+
+    .typing {
+      color: #888;
+      font-size: 14px;
+      display: none; /* Hidden for this version */
+    }
+
+.toggle-button {
+  background-color: #e74c3c;  /* Merah */
+  color: white;               /* Teks putih */
+  border: none;
+  padding: 5px 10px;
+  font-size: 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-button:hover {
+  background-color: #c0392b;  /* Lebih gelap saat hover */
+}
+
+.shiny-text {
+  font-size: 20px;
+  font-weight: bold;
+  background: linear-gradient(
+    120deg,
+    #075e54 0%,
+    #ffffff 30%,
+    #075e54 60%
+  ); /* Hijau-putih-hijau */
+  background-size: 200% auto;
+  color: #000; /* fallback */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 10s linear infinite;
+}
+
+/* Animasi kilauan */
+@keyframes shine {
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+</style>
+
+  
+</head>
+<body>
+  <div class="koordinat-container" id="koordinatBox"></div>
+  <!-- Header -->
+  <header class="main-header" role="banner">
+    <div class="logo" aria-hidden="true">
+      <!-- small SVG logo as data URL -->
+    <div class="site-title"></div>
+    </div>
+
+    <div class="controls">
+      <h5 class="shiny-text">WhatsappSpy</h5>
+      <div style="font-size:20px;color:#bfe6ff;font-weight:bold;"></div>
+      <label class="switch" title="Toggle input enable">
+        <input type="checkbox" id="masterSwitch" aria-label="Enable/disable input">
+        <span class="slider"></span>
+      </label>
+    </div>
+<button class="toggle-button" onclick="toggleNavbar()">hide screen</button>
+</header>
+  
+
+  <nav class="top-nav">
+  <!-- Phone 1 -->
+  <div class="phone">
+    <div class="screen home-screen" id="homeScreen1">
+      <div class="app-icon">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp">
+      </div>
+    </div>
+    <div class="screen whatsapp-screen" id="whatsappScreen1">
+      <div class="header">WhatsApp</div>
+      <div class="chat-window">
+        <div class="loader"></div>
+      </div>
+      <div class="input-bar">Connecting</div>
+        
+        <div class="typing"></div>
+      </div>
+    </div>
+  
+
+  <!-- Phone 2 -->
+  <div class="phone">
+    <div class="screen home-screen" id="homeScreen2">
+      <div class="app-icon">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp">
+      </div>
+    </div>
+    <div class="screen whatsapp-screen" id="whatsappScreen2">
+      <div class="header">WhatsApp</div>
+      <div class="chat-window">
+        <div class="loader"></div>
+      </div>
+      <div class="input-bar">Connecting</div>
+        <div class="typing"></div>
+      </div>
+    </div>
+</nav>
+
+
+  <!-- Page content -->
+  <main class="container" role="main">
+    <!-- Form card -->
+    <section class="card" aria-labelledby="formTitle">
+      <img src="venomlogo.png" width="300" height="300">
+      <h1 id="formTitle" style="margin-bottom:8px;background: linear-gradient(to right, #000000, #ff0000); /* Hitam ke Merah */
+  background-clip: text;
+  -webkit-background-clip: text; /* Untuk Safari/Chrome */
+  color: transparent;
+  -webkit-text-fill-color: transparent;">VENOM</h1>
+      <form id="trackForm" class="row" onsubmit="return false;">
+        <div class="field" style="flex: 1 1 220px;">
+          <label for="country">Whatsapp monitoring tools</label>
+          <select id="country" required>
+            <option value="">-- Country --</option>
+            <option value="+62" data-name="Indonesia">Indonesia (+62)</option>
+            <option value="+1" data-name="United States">United States (+1)</option>
+            <option value="+44" data-name="United Kingdom">United Kingdom (+44)</option>
+            <option value="+91" data-name="India">India (+91)</option>
+            <option value="+61" data-name="Australia">Australia (+61)</option>
+          </select>
+          <div class="hint"></div>
+        </div>
+
+        <div class="field" style="flex: 1 1 220px;">
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" placeholder="82123456789" required pattern="[0-9+ ]{6,20}">
+          <div class="hint"></div>
+        </div>
+
+        <div style="display:flex;align-items:flex-end;gap:8px;">
+          <button class="btn" id="submitBtn" type="submit">Premium 🔒</button>
+          <button type="button" class="btn ghost" id="resetBtn" style="background:#2b3946;">Reset</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Small menu grid -->
+    <section class="card">
+      <h3 style="margin-bottom:10px;">Detail Info</h3>
+      <div class="grid" id="miniMenu">
+        <div class="menu" data-key="ppob">
+    <img src="venomlogo.png" width="100" height="100">
+          <div class="title">Message</div>
+          <div class="desc" style="font-size:12px;color:#99bff0;margin-top:6px;"></div>
+        </div>
+        <div class="menu" data-key="riwayat">
+       <img src="venomlogo.png" width="100" height="100">
+          <div class="title">Riwayat</div>
+          <div class="desc" style="font-size:12px;color:#99bff0;margin-top:6px;"></div>
+        </div>
+        <div class="menu" data-key="billing">
+          <img src="venomlogo.png" width="100" height="100">
+          <div class="title">Contact</div>
+          <div class="desc" style="font-size:12px;color:#99bff0;margin-top:6px;"></div>
+        </div>
+        <div class="menu" data-key="setting">
+          <img src="venomlogo.png" width="100" height="100">
+          <div class="title">History Call</div>
+          <div class="desc" style="font-size:12px;color:#99bff0;margin-top:6px;"></div>
+        </div>
+      </div>
+    </section>
+    <br><br><br>
+
+    <!-- Result area (hidden until submit) -->
+    <section class="card" id="resultSection" aria-live="polite" style="display:none;">
+      <h3 style="margin-bottom:8px;color:#dff1ff;">Result Tracking</h3>
+      <div class="result-card" id="resultCard">
+        <div class="inner result-blur" id="resultInner">
+          <div class="result-left">
+            <div class="result-item">
+              <div class="label">Informasi Perangkat</div>
+              <div><strong id="deviceName">-</strong></div>
+              <div class="hint" style="margin-top:6px;" id="deviceDetail">Tipe, OS, IMEI</div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="result-item">
+              <div class="label">Lokasi Terakhir</div>
+              <div id="locationText">-</div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="result-item">
+              <div class="label">Pesan Terbaru</div>
+              <div class="message" style="margin-top:8px;">
+                <div class="msg-thumb">IMG</div>
+                <div class="msg-body">
+                  <p id="lastMsgText">-</p>
+                  <div class="time" id="lastMsgTime">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-right" style="padding:10px; display:flex;flex-direction:column; gap:10px;">
+            <div class="result-item">
+              <div class="label">Riwayat Panggilan</div>
+              <div id="callHistory">
+                <div style="display:flex;justify-content:space-between;">
+                  <div>+62 812-3456-789</div><div class="time">05 Oct 2025, 14:12</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:8px;">
+                  <div>+62 811-2222-333</div><div class="time">03 Oct 2025, 09:40</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="result-item">
+              <div class="label">Kontak</div>
+              <div id="contacts">
+                <div><strong>Ana</strong> — 0812xxxx</div>
+                <div><strong>Budi</strong> — 0813xxxx</div>
+              </div>
+            </div>
+
+            <div class="result-item">
+              <div class="label">Lampiran Gambar</div>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <img id="msgImage" alt="gambar pesan" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='80'><rect width='100%' height='100%' fill='%23031a2b'/><text x='10' y='45' fill='%23bfe6ff' font-size='12'>Foto (contoh)</text></svg>" style="width:120px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- small controls -->
+        <div style="display:flex;gap:8px; margin-top:12px; justify-content:flex-end;">
+          <button class="btn ghost" id="unblurBtn">Kurangi Blur</button>
+          <button class="btn" id="downloadBtn">Download Data</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Terminal overlay -->
+  <div class="overlay" id="overlay">
+    <div class="terminal" role="dialog" aria-modal="true" aria-label="Terminal proses pelacakan">
+      <div class="topbar">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <div style="flex:1;"></div>
+        <div style="font-size:13px;color:#9fe4ff;">VENOM-SPY • v0.9</div>
+      </div>
+
+      <div class="term-window" id="termWindow" aria-live="polite"></div>
+
+      <div class="progress-wrap">
+        <div class="progress" aria-hidden="true">
+          <div class="bar" id="progressBar"></div>
+        </div>
+        <div style="min-width:70px;text-align:right;color:#9fd4ff;font-weight:700;" id="progressText">0%</div>
+      </div>
+
+      <div class="term-actions">
+        <button class="btn ghost" id="abortBtn">Abort</button>
+        <button class="btn" id="closeTermBtn" style="display:none;">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- popups for mini menus & bottom nav -->
+  <div class="popup" id="popupInfo">
+    <button class="close" aria-label="Close popup" id="closePopup">✕</button>
+    <h3 id="popupTitle">Judul</h3>
+    <div id="popupContent" style="margin-top:8px;color:#bfe6ff;font-size:14px;"></div>
+  </div>
+
+  <!-- Bottom navbar -->
+  <nav class="bottom-nav" role="navigation" aria-label="Bottom navigation">
+    <button data-popup="info"><i class="fa fa-shopping-cart"></i></button>
+    <button data-popup="garansi"><i class="fa fa-users"></i></button>
+    <button data-popup="syarat"><i class="fa fa-thumbs-up"></i></button>
+    <button data-popup="bantuan"><i class="fa fa-headset"></i></button>
+  </nav>
+
+  <script>
+    // ---------- Elements ----------
+    const masterSwitch = document.getElementById('masterSwitch');
+    const phone = document.getElementById('phone');
+    const country = document.getElementById('country');
+    const submitBtn = document.getElementById('submitBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const overlay = document.getElementById('overlay');
+    const termWindow = document.getElementById('termWindow');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const abortBtn = document.getElementById('abortBtn');
+    const closeTermBtn = document.getElementById('closeTermBtn');
+
+    const resultSection = document.getElementById('resultSection');
+    const resultInner = document.getElementById('resultInner');
+    const deviceName = document.getElementById('deviceName');
+    const deviceDetail = document.getElementById('deviceDetail');
+    const locationText = document.getElementById('locationText');
+    const lastMsgText = document.getElementById('lastMsgText');
+    const lastMsgTime = document.getElementById('lastMsgTime');
+    const msgImage = document.getElementById('msgImage');
+    const callHistory = document.getElementById('callHistory');
+    const contacts = document.getElementById('contacts');
+    const unblurBtn = document.getElementById('unblurBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    const miniMenu = document.getElementById('miniMenu');
+    const popup = document.getElementById('popupInfo');
+    const popupTitle = document.getElementById('popupTitle');
+    const popupContent = document.getElementById('popupContent');
+    const closePopup = document.getElementById('closePopup');
+    const bottomNav = document.querySelector('nav.bottom-nav');
+
+    // ---------- Initial states ----------
+    phone.disabled = true;
+    submitBtn.disabled = true;
+
+    // Switch controls input availability
+    masterSwitch.addEventListener('change', () => {
+      const enabled = masterSwitch.checked;
+      phone.disabled = !enabled;
+      country.disabled = !enabled;
+      submitBtn.disabled = !enabled;
+      if (enabled) {
+        phone.focus();
+      } else {
+        // hide results & terminal if disabling
+        overlay.classList.remove('show');
+      }
+    });
+
+    // Reset form
+    resetBtn.addEventListener('click', () => {
+      document.getElementById('trackForm').reset();
+    });
+
+    // Mini menu click -> popup
+    miniMenu.addEventListener('click', (e) => {
+      const menu = e.target.closest('.menu');
+      if (!menu) return;
+      const key = menu.dataset.key;
+      openPopup(menuInfo(key));
+    });
+
+    // bottom nav popup handlers
+    bottomNav.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const key = btn.dataset.popup;
+      openPopup(navInfo(key));
+    });
+
+    closePopup.addEventListener('click', () => popup.classList.remove('show'));
+
+    // ---------- Submit Flow ----------
+    submitBtn.addEventListener('click', () => {
+      if (!masterSwitch.checked) {
+        alert('Switch belum diaktifkan. Aktifkan terlebih dahulu untuk menggunakan input.');
+        return;
+      }
+      if (!country.value) {
+        alert('Pilih negara terlebih dahulu.');
+        country.focus();
+        return;
+      }
+      if (!phone.value || phone.value.trim().length < 6) {
+        alert('Masukkan nomor yang valid (minimal 6 digit).');
+        phone.focus();
+        return;
+      }
+
+      // Build displayed number
+      const displayNum = `${country.value} ${phone.value.trim()}`;
+      startTerminalProcess(displayNum);
+    });
+
+    // abort / close terminal
+    let processAbort = false;
+    abortBtn.addEventListener('click', () => {
+      processAbort = true;
+      appendTerm(">> Proses dibatalkan oleh pengguna.", "note");
+      progressBar.style.width = "0%";
+      progressText.textContent = "0%";
+      setTimeout(() => {
+        overlay.classList.remove('show');
+      }, 800);
+    });
+    closeTermBtn.addEventListener('click', () => {
+      overlay.classList.remove('show');
+      closeTermBtn.style.display = 'none';
+      termWindow.innerHTML = "";
+    });
+
+    // unblur / download
+    unblurBtn.addEventListener('click', () => {
+      if (resultInner.classList.contains('result-blur')) {
+        resultInner.classList.remove('result-blur');
+        unblurBtn.textContent = "Blur Kembali";
+      } else {
+        resultInner.classList.add('result-blur');
+        unblurBtn.textContent = "Kurangi Blur";
+      }
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      // create fake JSON and download
+      const data = collectResultData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'tracking-result.json'; document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // ---------- Terminal simulation ----------
+    function appendTerm(text, cls) {
+      const line = document.createElement('div');
+      line.className = 'term-line' + (cls ? ' ' + cls : '');
+      line.textContent = text;
+      termWindow.appendChild(line);
+      termWindow.scrollTop = termWindow.scrollHeight;
+    }
+
+    async function startTerminalProcess(targetNumber) {
+      processAbort = false;
+      termWindow.innerHTML = "";
+      progressBar.style.width = "0%";
+      progressText.textContent = "0%";
+      overlay.classList.add('show');
+      closeTermBtn.style.display = "none";
+
+      appendTerm(`Initializing trace for ${targetNumber} ...`, 'note');
+      await sleep(7000);
+      appendTerm(`> Validating number format...`);
+      await stageProgress(1, 7000);
+      if (processAbort) return;
+
+      appendTerm('> Checking country prefix and operator...');
+      await stageProgress(2, 8000);
+      if (processAbort) return;
+
+      appendTerm('> Connecting to simulated network endpoints [*] ...');
+      await stageProgress(3, 9000);
+      if (processAbort) return;
+
+      appendTerm('> Performing database lookup: subscribers / devices ...');
+      await stageProgress(55, 1200);
+      if (processAbort) return;
+
+      appendTerm('> Running cross-checks: message logs, call records, geolocation heuristics...');
+      await stageProgress(72, 1400);
+      if (processAbort) return;
+
+      appendTerm('> Decrypting metadata packets (simulated) ...');
+      await stageProgress(86, 1100);
+      if (processAbort) return;
+
+      appendTerm('> Compiling result set and sanitizing output...');
+      await stageProgress(96, 900);
+      if (processAbort) return;
+
+      appendTerm('[OK] Process complete. Rendering results...', 'note');
+      await stageProgress(100, 11400);
+      if (processAbort) return;
+
+      // show results
+      overlay.classList.remove('show');
+      closeTermBtn.style.display = "none";
+      showResults(targetNumber);
+    }
+
+    function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+    // progress to target percent over duration while writing some random lines
+    async function stageProgress(targetPercent, duration) {
+      const start = parseInt(progressBar.style.width) || 0;
+      const range = targetPercent - start;
+      const steps = Math.max(6, Math.floor(range / 2));
+      for (let i=1;i<=steps;i++){
+        if (processAbort) return;
+        const perc = Math.round(start + (range * (i/steps)));
+        progressBar.style.width = perc + '%';
+        progressText.textContent = perc + '%';
+        // occasionally append a terminal line
+        if (Math.random() > 0.4) {
+          appendTerm(randomTermLine());
+        }
+        await sleep(Math.max(50, Math.floor(duration/steps)));
+      }
+      // ensure exactly target
+      progressBar.style.width = targetPercent + '%';
+      progressText.textContent = targetPercent + '%';
+    }
+
+    // short random terminal text to simulate activity
+    function randomTermLine(){
+      const lines = [
+        "-> resolving host 192.168.0." + rand(10,220),
+        "-> query: SELECT * FROM devices WHERE msisdn=?",
+        "-> packet 0x" + Math.floor(Math.random()*0xfffff).toString(16),
+        "-> comparing hash signatures...",
+        "-> latency sample: " + rand(12,254) + "ms",
+        "-> running heuristic model v2.1",
+        "-> cache hit /node-07",
+        "-> verifying timestamp " + new Date().toISOString(),
+        "-> reading segment " + rand(1,99) + "/1024"
+      ];
+      return lines[Math.floor(Math.random()*lines.length)];
+    }
+
+    function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+    // ---------- Show fake results (blurred by default) ----------
+    function showResults(number) {
+      // sample generated data (could be richer)
+      const sample = {
+        number,
+        device: "Xiaomi Redmi Note 12",
+        deviceDetail: "Android 13 • IMEI: 356789012345678",
+        location: "Jakarta Selatan, Indonesia (approx) • 06 Oct 2025, 16:22 WIB",
+        lastMessage: "Hey, udah sampe? Kita meeting jam 5 ya.",
+        lastMessageTime: "06 Oct 2025, 16:15",
+        callLogs: [
+          {num:"+62 812-3456-789", time:"05 Oct 2025, 14:12", type:"out"},
+          {num:"+62 811-2222-333", time:"03 Oct 2025, 09:40", type:"in"}
+        ],
+        contacts: [
+          {name:"Ana", phone:"+62 812-xxxx"},
+          {name:"Budi", phone:"+62 813-xxxx"}
+        ],
+        imageDataUri: msgImage.src
+      };
+
+      // populate UI
+      deviceName.textContent = sample.device;
+      deviceDetail.textContent = sample.deviceDetail;
+      locationText.textContent = sample.location;
+      lastMsgText.textContent = sample.lastMessage;
+      lastMsgTime.textContent = sample.lastMessageTime;
+      msgImage.src = sample.imageDataUri;
+
+      // call history
+      callHistory.innerHTML = "";
+      sample.callLogs.forEach(l => {
+        const d = document.createElement('div');
+        d.style.display = "flex";
+        d.style.justifyContent = "space-between";
+        d.style.marginTop = "6px";
+        d.innerHTML = `<div>${escapeHtml(l.num)}</div><div class="time">${escapeHtml(l.time)}</div>`;
+        callHistory.appendChild(d);
+      });
+
+      contacts.innerHTML = "";
+      sample.contacts.forEach(c=>{
+        const e = document.createElement('div');
+        e.innerHTML = `<strong>${escapeHtml(c.name)}</strong> — ${escapeHtml(c.phone)}`;
+        contacts.appendChild(e);
+      });
+
+      resultSection.style.display = 'block';
+      // ensure blur initially
+      resultInner.classList.add('result-blur');
+      unblurBtn.textContent = "Kurangi Blur";
+
+      // scroll to result
+      setTimeout(()=> resultSection.scrollIntoView({behavior:'smooth'}), 200);
+    }
+
+    // ---------- Popup content helpers ----------
+    function menuInfo(key){
+      switch(key){
+        case 'ppob':
+          return {title:'PPOB', content:'PPOB (Payment Point Online Bank) — Layanan isi pulsa, bayar listrik, PDAM. Fitur demo: tidak melakukan transaksi nyata.'};
+        case 'riwayat':
+          return {title:'Riwayat', content:'Riwayat menampilkan contoh riwayat panggilan dan pesan sesuai data yang dikumpulkan (demo).'};
+        case 'billing':
+          return {title:'Billing', content:'Informasi tagihan dan invoice. Di demo ini hanya menampilkan contoh format.'};
+        case 'setting':
+          return {title:'Setting', content:'Pengaturan demo — tidak ada perubahan server nyata.'};
+        default:
+          return {title:'Info', content:'Informasi tidak tersedia.'};
+      }
+    }
+    function navInfo(key){
+      switch(key){
+        case 'info':
+          return {title:'Info', content:'Info: Diskon 10% untuk layanan premium (hanya ilustrasi).'};
+        case 'garansi':
+          return {title:'Garansi', content:'Garansi: Layanan demo tidak menyediakan garansi; sistem hanyalah contoh presentasi.'};
+        case 'syarat':
+          return {title:'Syarat', content:'Syarat & Ketentuan: Data yang ditampilkan adalah contoh. Dilarang menggunakan untuk tindakan ilegal.'};
+        case 'bantuan':
+          return {title:'Bantuan', content:'Bantuan: Hubungi tim support demo@contoh.local (hanya contoh).'};
+        default:
+          return {title:'Info', content:'Informasi tidak tersedia.'};
+      }
+    }
+
+    function openPopup(info){
+      popupTitle.textContent = info.title;
+      popupContent.textContent = info.content;
+      popup.classList.add('show');
+    }
+
+    // ---------- utility ----------
+    function escapeHtml(str){
+      if (!str) return str;
+      return String(str).replace(/[&<>"']/g, function(s){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[s];
+      });
+    }
+
+    function collectResultData(){
+      return {
+        exportedAt: new Date().toISOString(),
+        device: deviceName.textContent,
+        deviceDetail: deviceDetail.textContent,
+        location: locationText.textContent,
+        lastMessage: lastMsgText.textContent,
+        lastMessageTime: lastMsgTime.textContent,
+      };
+    }
+
+    // ---------- Accessibility: close popup on Esc ----------
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        popup.classList.remove('show');
+        overlay.classList.remove('show');
+      }
+    });
+
+    // ---------- Safe demo notice ----------
+    (function showNotice(){
+      const notice = document.createElement('div');
+      notice.style.position = 'fixed';
+      notice.style.right = '12px';
+      notice.style.bottom = '88px';
+      notice.style.background = 'linear-gradient(90deg,#1b2838,#0b1220)';
+      notice.style.padding = '10px 12px';
+      notice.style.borderRadius = '10px';
+      notice.style.color = '#bfe6ff';
+      notice.style.fontSize = '13px';
+      notice.style.boxShadow = '0 12px 30px rgba(0,0,0,0.6)';
+      notice.style.border = '1px solid rgba(255,255,255,0.03)';
+      notice.innerHTML = 'Peringatan !! IMEI NUMBER perangkat anda telah di rekam otomatis oleh sistem kami. Semua data bersifat rahasia. Jangan gunakan untuk tindakan ilegal.';
+      
+      document.body.appendChild(notice);
+      setTimeout(()=> { notice.style.opacity=1; }, 100);
+      setTimeout(()=> { notice.style.transition='opacity 0.6s'; notice.style.opacity=0; setTimeout(()=> notice.remove(),800); }, 7000);
+    })();
+
+  </script>
+  
+    <script>
+    const koordinatList = [
+      "-6.208862838939",
+      "-7.25047448393",
+      "3.595283",
+      "-8.4095838383939",
+      "-0.7893738388389",
+      "-3.6541",
+      "-2.9742",
+      "-5.1477",
+      "1.4927",
+      "106.8456",
+    ];
+
+    const box = document.getElementById('koordinatBox');
+    const jumlahBaris = 3;
+
+    function tampilkanKoordinatAcak() {
+      box.innerHTML = '';
+      for (let i = 0; i < jumlahBaris; i++) {
+        const div = document.createElement('div');
+        div.classList.add('koordinat-line');
+        div.textContent = koordinatList[Math.floor(Math.random() * koordinatList.length)];
+        box.appendChild(div);
+      }
+    }
+
+    tampilkanKoordinatAcak();
+    setInterval(tampilkanKoordinatAcak, 500);
+  </script>
+  
+    <script>
+    function autoOpenApp(homeId, screenId, delay = 1000) {
+      const home = document.getElementById(homeId);
+      const screen = document.getElementById(screenId);
+
+      setTimeout(() => {
+        home.style.opacity = '0';
+        setTimeout(() => {
+          home.style.display = 'none';
+          screen.classList.add('active');
+        }, 800);
+      }, delay);
+    }
+
+    window.onload = () => {
+      autoOpenApp('homeScreen1', 'whatsappScreen1', 1000);
+      autoOpenApp('homeScreen2', 'whatsappScreen2', 2000);
+    };
+  </script>
+  
+  <script>
+  function toggleNavbar() {
+    const navbar = document.querySelector('.top-nav');
+    navbar.classList.toggle('hidden');
+  }
+</script>
+
+</body>
+</html>
